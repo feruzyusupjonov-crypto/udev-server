@@ -963,7 +963,10 @@ async function uploadPumpFunMetadata(params) {
   formData.append('showName', 'true');
 
   const PROXY = window.UDEV_SERVER || 'https://udev-server.railway.app';
-    const res = await fetch(PROXY + '/api/pumpfun/ipfs', { method: 'POST', body: formData });
+    // PumpPortal IPFS (same as pump.fun but works without CORS issues)
+    const ipfsRes = await fetch('https://pump.fun/api/ipfs', { method: 'POST', body: formData })
+      .catch(() => fetch((window.UDEV_SERVER || '') + '/api/pumpfun/ipfs', { method: 'POST', body: formData }));
+    const res = ipfsRes;
   if (!res.ok) throw new Error(`pump.fun API error: ${res.status}`);
   const data = await res.json();
   log('PUMP',`<span class="clr-green">✓ Metadata URI:</span> <span class="clr-blue">${data.metadataUri?.slice(0,40)}...</span>`,'ok');
@@ -1149,12 +1152,12 @@ async function deployCoin() {
       mint: mintKeypair.publicKey.toBase58(),
       denominatedInSol: 'true',
       amount: solAmt,
-      slippage: 10,
-      priorityFee: 0.0001,
+      slippage: 15,
+      priorityFee: parseFloat((currentPriorityFee / 1e9).toFixed(6)),
       pool: 'pump'
     };
 
-    const txRes = await fetch((window.UDEV_SERVER || 'https://udev-server.railway.app') + '/api/pumpfun/trade-local', {
+    const txRes = await fetch('https://pumpportal.fun/api/trade-local', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(tradeParams)
@@ -1162,7 +1165,13 @@ async function deployCoin() {
 
     if (!txRes.ok) {
       const errText = await txRes.text();
-      throw new Error(`pump.fun API: ${txRes.status} — ${errText.slice(0,100)}`);
+      if (txRes.status === 404) {
+        throw new Error('PumpPortal API недоступен. Проверьте интернет подключение и попробуйте снова.');
+      }
+      if (txRes.status === 400) {
+        throw new Error(`Неверные параметры: ${errText.slice(0,150)}`);
+      }
+      throw new Error(`API ошибка ${txRes.status}: ${errText.slice(0,100)}`);
     }
 
     setProgress(75, 'Signing transaction with Phantom...');
