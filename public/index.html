@@ -1093,7 +1093,7 @@ async function deployCoin() {
 
     // Step 1: Upload metadata to pump.fun IPFS
     setProgress(25, 'Uploading to pump.fun IPFS...');
-    let metadataUri = '';
+    let metadataUri = ''; // No image - will launch without image
     let metadataData = null;
 
     try {
@@ -1113,7 +1113,7 @@ async function deployCoin() {
         metadataUri = imgUri; // simplified fallback
       } else {
         log('WARN','No image/Pinata key — launching without image','warn');
-        metadataUri = '';
+        metadataUri = ''; // No image - will launch without image
       }
     }
 
@@ -1141,22 +1141,25 @@ async function deployCoin() {
     setProgress(60, 'Запрос транзакции от pump.fun...');
 
     // Call pump.fun trade-local API to get the create transaction
+    // PumpPortal exact parameter format (from docs)
     const tradeParams = {
-      publicKey: walletPubkey,
-      action: 'create',
+      publicKey: walletPubkey,                        // string: wallet address
+      action: 'create',                               // string: "create"
       tokenMetadata: {
-        name: name,
-        symbol: ticker,
-        uri: metadataUri,
+        name: name,                                   // string: token name
+        symbol: ticker,                               // string: ticker
+        uri: metadataUri,                             // string: IPFS metadata URI
       },
-      mint: mintKeypair.publicKey.toBase58(),
-      denominatedInSol: 'true',
-      amount: solAmt,
-      slippage: 15,
-      priorityFee: parseFloat((currentPriorityFee / 1e9).toFixed(6)),
-      pool: 'pump'
+      mint: mintKeypair.publicKey.toBase58(),         // string: new mint address
+      denominatedInSol: 'true',                       // string "true" / "false"
+      amount: solAmt,                                 // number: SOL amount for dev buy
+      slippage: 10,                                   // number: 0-100
+      priorityFee: 0.0005,                            // number: SOL (not microlamports!)
+      pool: 'pump'                                    // string: "pump"
     };
+    log('DEPLOY', `Params: ${name} | ${ticker} | ${solAmt} SOL | mint: ${mintKeypair.publicKey.toBase58().slice(0,8)}...`, 'info');
 
+    log('DEBUG', `Отправляем запрос на PumpPortal... mint: ${tradeParams.mint.slice(0,8)}`, 'sys');
     const txRes = await fetch('https://pumpportal.fun/api/trade-local', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
