@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>uDev Creator — Real Phantom Wallet</title>
+
+<!-- Solana Web3.js via CDN -->
+<script src="https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0b0e;--bg2:#111318;--bg3:#1a1d24;--bg4:#21252f;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--border3:rgba(255,255,255,0.22);
+  --text:#e8eaf0;--text2:#8890a4;--text3:#555d72;
+  --green:#00d68f;--green2:rgba(0,214,143,0.12);--green3:rgba(0,214,143,0.3);
+  --red:#ff4f6a;--red2:rgba(255,79,106,0.12);--red3:rgba(255,79,106,0.3);
+  --blue:#4a9eff;--blue2:rgba(74,158,255,0.12);--blue3:rgba(74,158,255,0.3);
+  --yellow:#f5c842;--yellow2:rgba(245,200,66,0.12);--yellow3:rgba(245,200,66,0.3);
+  --purple:#a78bfa;--purple2:rgba(167,139,250,0.12);--purple3:rgba(167,139,250,0.3);
+  --font:'Space Grotesk',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+
+/* ─── LAYOUT ──────────────────────────────────────────────── */
+.app{display:flex;height:100vh;overflow:hidden}
+
+.sidebar{width:52px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:2px;flex-shrink:0}
+.logo{width:30px;height:30px;background:linear-gradient(135deg,#4a9eff,#a78bfa);border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;margin-bottom:10px}
+.snav{width:38px;height:38px;border-radius:7px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;background:transparent;color:var(--text3);transition:all .15s}
+.snav:hover{background:var(--bg3);color:var(--text2)}
+.snav.active{background:var(--blue2);color:var(--blue)}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* ─── TOPBAR ──────────────────────────────────────────────── */
+.topbar{height:48px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0}
+.ml-auto{margin-left:auto}
+.flex-row{display:flex;align-items:center;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+
+/* Wallet button states */
+.wallet-btn{
+  padding:6px 14px;border-radius:8px;border:none;cursor:pointer;
+  font-family:var(--font);font-size:12px;font-weight:600;
+  transition:all .2s;display:flex;align-items:center;gap:6px;
+}
+.wallet-btn.disconnected{background:var(--purple2);border:1px solid var(--purple3);color:var(--purple)}
+.wallet-btn.disconnected:hover{background:var(--purple3)}
+.wallet-btn.connected{background:var(--green2);border:1px solid var(--green3);color:var(--green)}
+.wallet-btn.connected:hover{background:var(--red2);border-color:var(--red3);color:var(--red)}
+.wallet-btn.connecting{background:var(--blue2);border:1px solid var(--blue3);color:var(--blue);cursor:wait}
+
+/* ─── CONTENT ─────────────────────────────────────────────── */
+.content{flex:1;display:flex;overflow:hidden}
+
+/* ─── LEFT: Form ──────────────────────────────────────────── */
+.creator{width:390px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.creator-header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.creator-scroll{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.creator-scroll::-webkit-scrollbar{width:3px}
+.creator-scroll::-webkit-scrollbar-thumb{background:var(--bg4)}
+
+/* Form */
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.field input,.field textarea{
+  background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+  padding:8px 10px;color:var(--text);font-family:var(--font);font-size:13px;
+  outline:none;transition:border .15s;resize:none;width:100%;
+}
+.field input:focus,.field textarea:focus{border-color:var(--border3)}
+.field input::placeholder,.field textarea::placeholder{color:var(--text3)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* Image Upload */
+.img-area{
+  width:100%;height:100px;background:var(--bg3);border:1.5px dashed var(--border2);
+  border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;
+}
+.img-area:hover{border-color:var(--blue);background:var(--blue2)}
+.img-area .overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;border-radius:7px}
+.img-area:hover .overlay{display:flex}
+#imgInput{display:none}
+
+/* Platforms */
+.platforms{display:flex;flex-direction:column;gap:5px}
+.plat-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s}
+.plat-item:hover{border-color:var(--border2)}
+.plat-item.sel-sol{border-color:rgba(155,114,239,.5);background:rgba(155,114,239,.07)}
+.plat-item.sel-bnb{border-color:var(--yellow3);background:var(--yellow2)}
+.plat-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.plat-name{font-size:13px;font-weight:600;flex:1}
+.plat-chain{font-size:10px;padding:2px 5px;background:var(--bg4);border-radius:3px}
+.plat-check{width:16px;height:16px;border:1.5px solid var(--border2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s}
+.plat-item.sel-sol .plat-check,.plat-item.sel-bnb .plat-check{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* Presets */
+.presets{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.preset{padding:3px 9px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:11px;cursor:pointer;font-family:var(--font);transition:all .1s}
+.preset:hover{border-color:var(--border2);color:var(--text2)}
+.preset.active{background:var(--green2);border-color:var(--green3);color:var(--green)}
+
+.sol-wrap{position:relative}
+.sol-wrap input{padding-right:42px;font-family:var(--mono)}
+.sol-sfx{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text3);font-family:var(--mono)}
+
+/* Toggles */
+.tog-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)}
+.tog-info{display:flex;flex-direction:column;gap:1px}
+.tog-title{font-size:13px;font-weight:500}
+.tog-desc{font-size:10px;color:var(--text3)}
+.tog{width:34px;height:18px;border-radius:9px;background:var(--bg4);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;border:none}
+.tog.on{background:var(--green)}
+.tog::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s}
+.tog.on::after{transform:translateX(16px)}
+
+/* Tool buttons */
+.tool-btns{display:flex;gap:5px}
+.tool-btn{flex:1;padding:7px 5px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:3px}
+.tool-btn:hover{border-color:var(--border2);color:var(--text)}
+.tool-btn.act-purple{border-color:var(--purple);background:var(--purple2);color:var(--purple)}
+.tool-btn.act-green{border-color:var(--green);background:var(--green2);color:var(--green)}
+.tool-btn.act-yellow{border-color:var(--yellow);background:var(--yellow2);color:var(--yellow)}
+
+/* Deploy button */
+.deploy-btn{
+  width:100%;padding:13px;border-radius:10px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#4a9eff,#a78bfa);
+  color:#fff;font-size:15px;font-weight:700;font-family:var(--font);transition:all .2s;
+}
+.deploy-btn:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.1)}
+.deploy-btn:disabled{opacity:.45;cursor:not-allowed}
+.deploy-btn.loading{animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.6}}
+
+.vamp-btn{width:100%;padding:8px;border-radius:8px;border:1px solid var(--red);background:var(--red2);color:var(--red);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s;margin-top:6px}
+.vamp-btn:hover{background:var(--red3)}
+
+.divider{width:100%;height:1px;background:var(--border);margin:2px 0}
+
+/* ─── RIGHT PANEL ──────────────────────────────────────────── */
+.right-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.preview-scroll{flex:1;overflow-y:auto}
+.panel-hdr{padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:6px;background:var(--bg2);flex-shrink:0}
+
+/* Token preview card */
+.prev-card{width:100%;max-width:310px;background:var(--bg2);border-radius:14px;border:1px solid var(--border2);overflow:hidden}
+.prev-img-wrap{width:100%;height:130px;background:linear-gradient(135deg,#111a2e,#1f1030);display:flex;align-items:center;justify-content:center;font-size:36px;position:relative;overflow:hidden}
+.prev-img-wrap img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.prev-body{padding:12px}
+.prev-name{font-size:18px;font-weight:700;margin-bottom:2px}
+.prev-ticker{font-size:12px;color:var(--text3);font-family:var(--mono);margin-bottom:8px}
+.prev-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:10px}
+.prev-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.pcs{background:var(--bg3);border-radius:6px;padding:6px 8px}
+.pcs-l{font-size:9px;color:var(--text3);margin-bottom:2px;text-transform:uppercase}
+.pcs-v{font-size:12px;font-weight:600;font-family:var(--mono)}
+.prev-plats{display:flex;gap:5px;padding:10px 12px 12px;flex-wrap:wrap}
+.plat-pill{padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;border:1px solid}
+
+/* Wallet info card */
+.wallet-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.wallet-addr{font-family:var(--mono);font-size:12px;color:var(--blue)}
+.wallet-bal-big{font-size:24px;font-weight:700;font-family:var(--mono);color:var(--green)}
+
+/* Console */
+.console{height:210px;background:var(--bg);border-top:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.con-body{flex:1;overflow-y:auto;padding:8px 12px;font-family:var(--mono);font-size:11px;display:flex;flex-direction:column;gap:3px}
+.con-body::-webkit-scrollbar{width:3px}
+.con-body::-webkit-scrollbar-thumb{background:var(--bg4)}
+.log-line{display:flex;gap:8px;align-items:flex-start;line-height:1.4}
+.log-t{color:var(--text3);flex-shrink:0;font-size:10px;margin-top:2px}
+.log-tag{padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px}
+.t-info{background:var(--blue2);color:var(--blue)}
+.t-ok{background:var(--green2);color:var(--green)}
+.t-err{background:var(--red2);color:var(--red)}
+.t-warn{background:var(--yellow2);color:var(--yellow)}
+.t-sys{background:var(--bg4);color:var(--text3)}
+.log-msg{color:var(--text2)}
+.hi{color:var(--text)}
+.clr-green{color:var(--green)}
+.clr-blue{color:var(--blue)}
+.clr-yellow{color:var(--yellow)}
+.clr-red{color:var(--red)}
+.clr-purple{color:var(--purple)}
+
+/* ─── MODALS ─────────────────────────────────────────────── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:22px;width:360px}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:6px}
+.modal-desc{font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5}
+.modal-btns{display:flex;gap:8px;margin-top:14px}
+.btn-p{flex:1;padding:9px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-weight:600;cursor:pointer;font-family:var(--font);font-size:13px;transition:all .15s}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-s{flex:1;padding:9px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-weight:600;cursor:pointer;font-family:var(--font);font-size:13px}
+.btn-s:hover{background:var(--bg3)}
+
+/* Success Modal */
+.succ-card{background:var(--bg2);border:1px solid var(--green3);border-radius:16px;padding:28px;width:380px;text-align:center}
+.succ-icon{font-size:44px;margin-bottom:10px}
+.succ-title{font-size:20px;font-weight:700;color:var(--green);margin-bottom:5px}
+.succ-sub{font-size:13px;color:var(--text2);margin-bottom:14px}
+.succ-ca{background:var(--bg3);border-radius:8px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--blue);margin-bottom:14px;word-break:break-all;border:1px solid var(--border2);cursor:pointer;transition:background .15s}
+.succ-ca:hover{background:var(--bg4)}
+.succ-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.sg{background:var(--bg3);border-radius:8px;padding:8px 10px;text-align:left}
+.sg-l{font-size:10px;color:var(--text3);margin-bottom:2px}
+.sg-v{font-size:14px;font-weight:700;font-family:var(--mono)}
+.succ-btn{width:100%;padding:11px;border-radius:9px;border:none;background:linear-gradient(135deg,#4a9eff,#a78bfa);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .2s}
+.succ-btn:hover{filter:brightness(1.1)}
+.succ-btn2{width:100%;padding:8px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:var(--font);font-size:13px;margin-top:7px}
+
+/* Multi panel */
+.multi-panel{background:var(--bg3);border-radius:9px;border:1px solid var(--border);padding:10px;display:flex;flex-direction:column;gap:7px}
+.multi-row{display:flex;align-items:center;gap:7px}
+.multi-n{width:20px;height:20px;border-radius:50%;background:var(--purple2);color:var(--purple);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* Progress bar */
+.progress-wrap{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;margin:2px 0}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));border-radius:2px;transition:width .4s ease;width:0%}
+
+/* No Phantom banner */
+.no-phantom{display:none;background:var(--yellow2);border:1px solid var(--yellow3);border-radius:9px;padding:10px 12px;font-size:12px;color:var(--yellow);margin:10px 14px}
+.no-phantom a{color:var(--yellow);font-weight:600}
+</style>
+
+<!-- uDev Server Config — измените URL после деплоя на Railway -->
+<script>
+  // После деплоя сервера на Railway замените на ваш URL:
+  // window.UDEV_SERVER = 'https://ваш-проект.railway.app';
+  window.UDEV_SERVER = 'https://udev-server.railway.app';
+</script>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo">A</div>
+    <button class="snav" title="AIO">⚡</button>
+    <button class="snav" title="DEX">🔭</button>
+    <button class="snav active" title="uDev">🚀</button>
+    <button class="snav" title="X">𝕏</button>
+    <button class="snav" title="Portfolio">💼</button>
+    <div style="flex:1"></div>
+    <button class="snav" title="Settings">⚙</button>
+  </div>
+
+  <div class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <span style="font-size:13px;color:var(--text3)">terminal</span>
+      <span style="font-weight:600;font-size:14px">uDev Creator</span>
+      <span class="chip" style="background:var(--green2);color:var(--green);border:1px solid var(--green3)">● LIVE</span>
+      <span class="chip" style="background:var(--blue2);color:var(--blue);border:1px solid var(--blue3)" id="chain-badge">SOL</span>
+
+      <div class="flex-row ml-auto">
+        <!-- Wallet info (shown when connected) -->
+        <div id="wallet-info" style="display:none;align-items:center;gap:8px" class="flex-row">
+          <span style="font-size:11px;color:var(--text2);font-family:var(--mono)" id="wallet-addr-short"></span>
+          <span style="font-size:12px;font-weight:600;font-family:var(--mono);color:var(--green)" id="wallet-bal-top">0.00 SOL</span>
+        </div>
+        <button onclick="switchChain()" style="padding:5px 10px;border-radius:6px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);font-size:11px;cursor:pointer;font-family:var(--font)">SOL / BNB</button>
+        <button class="wallet-btn disconnected" id="walletBtn" onclick="toggleWallet()">
+          <span id="walletBtnIcon">👻</span>
+          <span id="walletBtnText">Connect Phantom</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- LEFT: Form -->
+      <div class="creator">
+        <div class="creator-header">
+          <span style="font-size:16px">🚀</span>
+          <span style="font-weight:600;font-size:14px">Launch Panel</span>
+          <div class="ml-auto">
+            <span class="chip" style="background:var(--bg3);color:var(--text3);font-size:9px;border:1px solid var(--border)">&lt;100ms</span>
+          </div>
+        </div>
+
+        <!-- No Phantom warning -->
+        <div class="no-phantom" id="noPhantom">
+          ⚠️ Phantom Wallet не обнаружен. <a href="https://phantom.app" target="_blank">Установите Phantom →</a>
+        </div>
+
+        <div class="creator-scroll">
+
+          <!-- Image Upload -->
+          <div class="field">
+            <label>Token Image</label>
+            <div class="img-area" onclick="document.getElementById('imgInput').click()" id="imgDrop">
+              <div id="imgPrevWrap" style="display:none;position:absolute;inset:0">
+                <img id="imgPrev" src="" style="width:100%;height:100%;object-fit:cover;border-radius:7px">
+                <div class="overlay"><span style="font-size:18px">✏️</span></div>
+              </div>
+              <div id="imgPlaceholder">
+                <div style="font-size:22px">🖼️</div>
+                <div style="font-size:11px;color:var(--text3)">Click or drag image here</div>
+                <div style="font-size:10px;color:var(--text3)">PNG, JPG, GIF — max 5MB</div>
+              </div>
+            </div>
+            <input type="file" id="imgInput" accept="image/*" onchange="handleImg(this)">
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Name + Ticker -->
+          <div class="field-row">
+            <div class="field">
+              <label>Coin Name</label>
+              <input type="text" id="coinName" placeholder="MoonCat" oninput="updatePreview()" maxlength="32">
+            </div>
+            <div class="field">
+              <label>Ticker</label>
+              <input type="text" id="coinTicker" placeholder="MCAT" oninput="updatePreview()" maxlength="10" style="text-transform:uppercase">
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Description</label>
+            <textarea id="coinDesc" rows="2" placeholder="What makes this coin special?" oninput="updatePreview()" maxlength="200"></textarea>
+            <div style="display:flex;justify-content:space-between;margin-top:2px">
+              <span style="font-size:10px;color:var(--text3)">Shown on pump.fun listing</span>
+              <span style="font-size:10px;color:var(--text3)" id="desc-count">0/200</span>
+            </div>
+          </div>
+
+          <!-- Social Links -->
+          <div class="field">
+            <label>Social Links (optional)</label>
+            <input type="text" id="coinTwitter" placeholder="𝕏 Twitter URL" style="margin-bottom:5px">
+            <input type="text" id="coinTelegram" placeholder="✈️ Telegram URL" style="margin-bottom:5px">
+            <input type="text" id="coinWebsite" placeholder="🌐 Website URL">
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Platform -->
+          <div class="field">
+            <label>Launch Platform</label>
+            <div class="platforms" id="platforms">
+              <div class="plat-item sel-sol" data-p="pump" onclick="selectPlat(this)">
+                <div class="plat-icon" style="background:#1a0a2e;color:#9b72ef">P</div>
+                <div style="flex:1">
+                  <div class="plat-name">pump.fun</div>
+                  <div style="font-size:10px;color:var(--text3)">Bonding curve launch</div>
+                </div>
+                <div class="plat-chain" style="color:#9b72ef">SOL</div>
+                <div class="plat-check">✓</div>
+              </div>
+              <div class="plat-item" data-p="bonk" onclick="selectPlat(this)">
+                <div class="plat-icon" style="background:#1a2a0a;color:#8bc34a">B</div>
+                <div style="flex:1">
+                  <div class="plat-name">Bonk Launch</div>
+                  <div style="font-size:10px;color:var(--text3)">bonk.fun launchpad</div>
+                </div>
+                <div class="plat-chain" style="color:#9b72ef">SOL</div>
+                <div class="plat-check"></div>
+              </div>
+              <div class="plat-item" data-p="fourmeme" onclick="selectPlat(this)">
+                <div class="plat-icon" style="background:#2a1a0a;color:#f5c842">4</div>
+                <div style="flex:1">
+                  <div class="plat-name">FourMeme</div>
+                  <div style="font-size:10px;color:var(--text3)">BNB chain launch</div>
+                </div>
+                <div class="plat-chain" style="color:var(--yellow)">BNB</div>
+                <div class="plat-check"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Dev Buy Amount -->
+          <div class="field">
+            <label>Dev Buy Amount</label>
+            <div class="sol-wrap">
+              <input type="number" id="solAmount" value="0.1" min="0.001" step="0.01" oninput="updatePreview()">
+              <span class="sol-sfx" id="amtSfx">SOL</span>
+            </div>
+            <div class="presets">
+              <button class="preset" onclick="setAmt(0.05,this)">0.05</button>
+              <button class="preset active" onclick="setAmt(0.1,this)">0.1</button>
+              <button class="preset" onclick="setAmt(0.25,this)">0.25</button>
+              <button class="preset" onclick="setAmt(0.5,this)">0.5</button>
+              <button class="preset" onclick="setAmt(1,this)">1.0</button>
+            </div>
+            <div id="balance-warn" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠️ Insufficient balance</div>
+          </div>
+
+          <!-- IPFS / Pinata Key -->
+          <div style="background:var(--bg3);border:1px solid var(--blue);border-radius:10px;padding:12px 12px 10px;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+              <span style="font-size:14px">🔑</span>
+              <span style="font-size:12px;font-weight:700;color:var(--blue)">Pinata JWT — обязателен для деплоя</span>
+            </div>
+            <input type="password" id="pinataKey"
+              placeholder="Вставьте JWT сюда..."
+              style="width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:7px;padding:9px 10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;margin-bottom:7px">
+            <div style="display:flex;gap:6px">
+              <button onclick="savePinataKey()" style="flex:1;padding:7px;border-radius:7px;border:none;background:var(--blue);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">💾 Сохранить ключ</button>
+              <button onclick="togglePinataVis()" id="pinataVisBtn" style="padding:7px 10px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:var(--font)">👁</button>
+            </div>
+            <div id="pinataStatus" style="display:none;margin-top:6px;font-size:11px;padding:5px 8px;border-radius:5px"></div>
+            <div style="font-size:10px;color:var(--text3);margin-top:6px">
+              Получить бесплатно: <a href="https://app.pinata.cloud/developers/api-keys" target="_blank" style="color:var(--blue)">pinata.cloud → API Keys → New Key</a>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Advanced Tools -->
+          <div class="field">
+            <label>Advanced Tools</label>
+            <div class="tool-btns">
+              <button class="tool-btn" id="btn-multi" onclick="toggleTool('multi')">
+                <span>⧉</span><span style="font-size:9px">Multi-Deploy</span>
+              </button>
+              <button class="tool-btn" id="btn-autosell" onclick="toggleTool('autosell')">
+                <span>🤖</span><span style="font-size:9px">Auto-Sell</span>
+              </button>
+              <button class="tool-btn" id="btn-sniper" onclick="toggleTool('sniper')">
+                <span>🎯</span><span style="font-size:9px">Sniper</span>
+              </button>
+              <button class="tool-btn" id="btn-mayhem" onclick="toggleTool('mayhem')">
+                <span>🌪️</span><span style="font-size:9px">Mayhem</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Multi sub -->
+          <div id="multi-sub" style="display:none" class="multi-panel">
+            <div style="font-size:11px;font-weight:600;color:var(--purple)">Multi-Deploy — up to 4 additional coins</div>
+            <div id="multi-coins"></div>
+            <div style="display:flex;gap:6px">
+              <button class="preset" onclick="addMultiCoin()" style="flex:1">+ Add</button>
+              <button class="preset" onclick="clearMulti()" style="flex:1;color:var(--red)">Clear</button>
+            </div>
+          </div>
+
+          <!-- AutoSell sub -->
+          <div id="autosell-sub" style="display:none" class="multi-panel">
+            <div style="font-size:11px;font-weight:600;color:var(--green)">Auto-Sell Config</div>
+            <div class="field-row">
+              <div class="field"><label>Delay (ms)</label><input type="number" id="sellDelay" value="500" min="1" style="font-family:var(--mono)"></div>
+              <div class="field"><label>Sell %</label><input type="number" id="sellPct" value="100" min="1" max="100"></div>
+            </div>
+          </div>
+
+          <!-- Toggles -->
+          <div class="tog-row">
+            <div class="tog-info">
+              <div class="tog-title">Trade (Dev Buy/Sell)</div>
+              <div class="tog-desc">0.75% fee vs 1% standard</div>
+            </div>
+            <button class="tog on" onclick="this.classList.toggle('on')"></button>
+          </div>
+          <div class="tog-row">
+            <div class="tog-info">
+              <div class="tog-title">Bypass Mode</div>
+              <div class="tog-desc">Hide uDev attribution on-chain</div>
+            </div>
+            <button class="tog" onclick="this.classList.toggle('on')"></button>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Progress bar (hidden until deploy) -->
+          <div id="deploy-progress" style="display:none">
+            <div style="font-size:11px;color:var(--text2);margin-bottom:5px" id="progress-label">Initializing...</div>
+            <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+          </div>
+
+          <!-- Deploy + Vamp -->
+          <button class="deploy-btn" id="deployBtn" onclick="deployCoin()">🚀 Deploy Coin</button>
+          <button class="vamp-btn" onclick="openVamp()">🧛 Vamp Coin — Clone from Contract Address</button>
+          <div style="text-align:center;font-size:10px;color:var(--text3);padding:3px 0">Fee: 1.25% + Launchpad fee</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Preview + Wallet + Console -->
+      <div class="right-panel">
+        <div class="preview-scroll">
+          <div class="panel-hdr"><span>👁️</span> Live Preview</div>
+
+          <!-- Wallet Card (shown when connected) -->
+          <div id="walletCard" style="display:none;padding:14px 16px">
+            <div class="wallet-card">
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Connected Wallet</div>
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#4a9eff,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:16px">👻</div>
+                <div>
+                  <div class="wallet-addr" id="walletAddrFull"></div>
+                  <div style="font-size:10px;color:var(--text3)">Phantom Wallet</div>
+                </div>
+                <div class="ml-auto" style="text-align:right">
+                  <div class="wallet-bal-big" id="walletBalBig">0.00</div>
+                  <div style="font-size:11px;color:var(--text3)">SOL</div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div style="background:var(--bg3);border-radius:7px;padding:7px 9px">
+                  <div style="font-size:10px;color:var(--text3);margin-bottom:2px">USD Value</div>
+                  <div style="font-size:13px;font-weight:600;font-family:var(--mono)" id="walletUsd">$0.00</div>
+                </div>
+                <div style="background:var(--bg3);border-radius:7px;padding:7px 9px">
+                  <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Network</div>
+                  <div style="font-size:13px;font-weight:600;color:var(--green)">Mainnet</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Token Preview Card -->
+          <div style="padding:14px 16px;display:flex;justify-content:center">
+            <div class="prev-card">
+              <div class="prev-img-wrap" id="prevImgWrap">
+                <span id="prevEmoji">🚀</span>
+                <img id="prevImg" src="" style="display:none">
+              </div>
+              <div class="prev-body">
+                <div class="prev-name" id="prevName">Coin Name</div>
+                <div class="prev-ticker" id="prevTicker">$TICK · pump.fun</div>
+                <div class="prev-desc" id="prevDesc">Your description here...</div>
+                <div class="prev-stats">
+                  <div class="pcs"><div class="pcs-l">Price</div><div class="pcs-v" style="color:var(--green)">$0.000</div></div>
+                  <div class="pcs"><div class="pcs-l">Market Cap</div><div class="pcs-v">$0</div></div>
+                  <div class="pcs"><div class="pcs-l">Dev Buy</div><div class="pcs-v" id="prevBuy">0.1 SOL</div></div>
+                </div>
+              </div>
+              <div class="prev-plats" id="prevPlats">
+                <span class="plat-pill" style="background:rgba(155,114,239,.12);color:#9b72ef;border-color:rgba(155,114,239,.3)">pump.fun</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick stats grid -->
+          <div style="padding:0 16px 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Est. Fee</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:600" id="statFee">~0.023 SOL</div>
+            </div>
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Speed</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--green)">&lt;100ms</div>
+            </div>
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:10px 12px">
+              <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Tools</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--purple)" id="statTools">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Console -->
+        <div class="console">
+          <div class="panel-hdr">
+            <span>💻</span> Activity Log
+            <button onclick="clearLog()" style="margin-left:auto;font-size:10px;padding:2px 7px;border-radius:4px;background:var(--bg3);border:1px solid var(--border);color:var(--text3);cursor:pointer;font-family:var(--font)">Clear</button>
+          </div>
+          <div class="con-body" id="console"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Vamp Modal -->
+<div class="overlay" id="vampOverlay">
+  <div class="modal">
+    <div class="modal-title">🧛 Vamp Coin</div>
+    <div class="modal-desc">Введите contract address любого токена — uDev автоматически подтянет данные и заполнит форму.</div>
+    <div class="field">
+      <label>Contract Address (CA)</label>
+      <input type="text" id="vampCA" placeholder="7GCihgDB8fe6KNjn2MktkpxDDgFjNb..." style="font-family:var(--mono);font-size:12px">
+    </div>
+    <div style="margin-top:8px">
+      <div class="tog-row">
+        <div class="tog-info">
+          <div class="tog-title">Insta-Vamp</div>
+          <div class="tog-desc">Авто-деплой сразу после получения данных</div>
+        </div>
+        <button class="tog" id="togInstaVamp" onclick="this.classList.toggle('on')"></button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-s" onclick="closeVamp()">Отмена</button>
+      <button class="btn-p" onclick="doVamp()">🧛 Fetch & Vamp</button>
+    </div>
+  </div>
+</div>
+
+<!-- Success Modal -->
+<div class="overlay" id="succOverlay">
+  <div class="succ-card">
+    <div class="succ-icon">🎉</div>
+    <div class="succ-title">Token Deployed!</div>
+    <div class="succ-sub" id="succSub">Your token is now live</div>
+    <div class="succ-ca" id="succCa" onclick="copyCa()" title="Click to copy">––</div>
+    <div style="font-size:10px;color:var(--text3);margin-top:-10px;margin-bottom:12px">Click to copy contract address</div>
+    <div class="succ-grid">
+      <div class="sg"><div class="sg-l">Dev Buy</div><div class="sg-v clr-green" id="succBuy">–</div></div>
+      <div class="sg"><div class="sg-l">Platform</div><div class="sg-v clr-purple" id="succPlat">–</div></div>
+      <div class="sg"><div class="sg-l">Tx Speed</div><div class="sg-v clr-blue" id="succSpeed">–</div></div>
+      <div class="sg"><div class="sg-l">Status</div><div class="sg-v clr-green">LIVE ●</div></div>
+    </div>
+    <button class="succ-btn" id="succExplorer" onclick="openExplorer()">View on Solscan →</button>
+    <button class="succ-btn2" onclick="closeSucc()">Close</button>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   uDev Creator — Real Phantom Wallet + pump.fun Integration
+   
+   РЕАЛЬНЫЙ ДЕПЛОЙ требует:
+   1. Phantom Wallet (https://phantom.app)
+   2. Pinata API JWT (https://pinata.cloud) — для загрузки изображений
+   3. Минимум ~0.02 SOL на газ + сумма dev buy
+   
+   pump.fun API:
+   - Metadata upload: POST https://pump.fun/api/ipfs
+   - Token create: через Solana транзакцию (см. deployCoin())
+   ================================================================ */
+
+// ── STATE ──────────────────────────────────────────────────────
+let walletPubkey = null;
+let walletBalance = 0;
+let solPrice = 150; // fallback, fetches real price
+let selectedPlats = ['pump'];
+let activeTools = new Set();
+let multiCoins = [];
+let currentChain = 'SOL';
+let imgFile = null;
+let imgDataUrl = null;
+let lastTxCa = '';
+let lastTxSpeed = 0;
+
+const PLAT_NAMES = { pump:'pump.fun', bonk:'Bonk Launch', fourmeme:'FourMeme' };
+const RPC_ENDPOINT = 'https://api.mainnet-beta.solana.com';
+
+// ── LOGGING ────────────────────────────────────────────────────
+function log(tag, msg, type='info') {
+  const c = document.getElementById('console');
+  const now = new Date();
+  const ts = [now.getHours(),now.getMinutes(),now.getSeconds()].map(n=>n.toString().padStart(2,'0')).join(':');
+  const cls = {info:'t-info',ok:'t-ok',err:'t-err',warn:'t-warn',sys:'t-sys'}[type]||'t-info';
+  const el = document.createElement('div');
+  el.className = 'log-line';
+  el.innerHTML = `<span class="log-t">${ts}</span><span class="log-tag ${cls}">${tag.toUpperCase()}</span><span class="log-msg">${msg}</span>`;
+  c.appendChild(el);
+  c.scrollTop = c.scrollHeight;
+}
+function clearLog(){ document.getElementById('console').innerHTML=''; }
+
+// ── PHANTOM WALLET ─────────────────────────────────────────────
+function getPhantom() {
+  return window.solana && window.solana.isPhantom ? window.solana : null;
+}
+
+function checkPhantomInstalled() {
+  if (!getPhantom()) {
+    document.getElementById('noPhantom').style.display = 'block';
+    log('WALLET','Phantom not detected — please install from phantom.app','warn');
+  }
+}
+
+async function toggleWallet() {
+  if (walletPubkey) {
+    disconnectWallet();
+  } else {
+    await connectWallet();
+  }
+}
+
+async function connectWallet() {
+  const phantom = getPhantom();
+  if (!phantom) {
+    log('ERR','Phantom Wallet not installed! Visit phantom.app','err');
+    window.open('https://phantom.app','_blank');
+    return;
+  }
+  setWalletBtn('connecting','⏳','Connecting...');
+  try {
+    log('WALLET','Requesting Phantom connection...','info');
+    const resp = await phantom.connect();
+    walletPubkey = resp.publicKey.toString();
+    onWalletConnected();
+  } catch(e) {
+    log('ERR',`Connection rejected: ${e.message}`,'err');
+    setWalletBtn('disconnected','👻','Connect Phantom');
+  }
+}
+
+function disconnectWallet() {
+  const phantom = getPhantom();
+  if (phantom) phantom.disconnect();
+  walletPubkey = null;
+  walletBalance = 0;
+  onWalletDisconnected();
+}
+
+function onWalletConnected() {
+  log('WALLET',`<span class="clr-green">✓ Connected:</span> <span class="clr-blue">${walletPubkey.slice(0,8)}...${walletPubkey.slice(-6)}</span>`,'ok');
+  setWalletBtn('connected','✓',walletPubkey.slice(0,4)+'...'+walletPubkey.slice(-4));
+  document.getElementById('wallet-info').style.display = 'flex';
+  document.getElementById('walletCard').style.display = 'block';
+  document.getElementById('walletAddrFull').textContent = walletPubkey.slice(0,12)+'...'+walletPubkey.slice(-8);
+  document.getElementById('wallet-addr-short').textContent = walletPubkey.slice(0,4)+'...'+walletPubkey.slice(-4);
+  document.getElementById('noPhantom').style.display = 'none';
+  fetchBalance();
+  fetchSolPrice();
+}
+
+function onWalletDisconnected() {
+  log('WALLET','Wallet disconnected','sys');
+  setWalletBtn('disconnected','👻','Connect Phantom');
+  document.getElementById('wallet-info').style.display = 'none';
+  document.getElementById('walletCard').style.display = 'none';
+  document.getElementById('balance-warn').style.display = 'none';
+}
+
+function setWalletBtn(state, icon, text) {
+  const btn = document.getElementById('walletBtn');
+  btn.className = `wallet-btn ${state}`;
+  document.getElementById('walletBtnIcon').textContent = icon;
+  document.getElementById('walletBtnText').textContent = text;
+}
+
+async function fetchBalance() {
+  if (!walletPubkey) return;
+  try {
+    // Use @solana/web3.js via CDN
+    const conn = new solanaWeb3.Connection(RPC_ENDPOINT, 'confirmed');
+    const pubkey = new solanaWeb3.PublicKey(walletPubkey);
+    const lamports = await conn.getBalance(pubkey);
+    walletBalance = lamports / solanaWeb3.LAMPORTS_PER_SOL;
+    updateBalanceDisplay();
+    log('RPC',`Balance: <span class="clr-green">${walletBalance.toFixed(4)} SOL</span>`,'ok');
+  } catch(e) {
+    log('RPC',`Balance fetch failed: ${e.message}`,'warn');
+    // Fallback to RPC call
+    try {
+      const res = await fetch(RPC_ENDPOINT, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({jsonrpc:'2.0',id:1,method:'getBalance',params:[walletPubkey]})
+      });
+      const d = await res.json();
+      if (d.result?.value !== undefined) {
+        walletBalance = d.result.value / 1e9;
+        updateBalanceDisplay();
+        log('RPC',`Balance: <span class="clr-green">${walletBalance.toFixed(4)} SOL</span>`,'ok');
+      }
+    } catch(e2) {}
+  }
+}
+
+function updateBalanceDisplay() {
+  document.getElementById('walletBalBig').textContent = walletBalance.toFixed(4);
+  document.getElementById('wallet-bal-top').textContent = walletBalance.toFixed(3) + ' SOL';
+  const usdVal = (walletBalance * solPrice).toFixed(2);
+  document.getElementById('walletUsd').textContent = '$' + usdVal;
+  checkBalanceWarning();
+}
+
+async function fetchSolPrice() {
+  try {
+    const r = await fetch((window.UDEV_SERVER || 'https://udev-server.railway.app') + '/api/sol-price');
+    const d = await r.json();
+    solPrice = d.usd || 150;
+    if (walletPubkey) updateBalanceDisplay();
+  } catch(e) {}
+}
+
+function checkBalanceWarning() {
+  const needed = parseFloat(document.getElementById('solAmount').value)||0.1;
+  const warn = document.getElementById('balance-warn');
+  if (walletPubkey && walletBalance < needed + 0.01) {
+    warn.style.display = 'block';
+    warn.textContent = `⚠️ Need ~${(needed+0.01).toFixed(3)} SOL, have ${walletBalance.toFixed(4)} SOL`;
+  } else {
+    warn.style.display = 'none';
+  }
+}
+
+// ── IMAGE UPLOAD ───────────────────────────────────────────────
+function handleImg(inp) {
+  const file = inp.files[0];
+  if (!file) return;
+  if (file.size > 5*1024*1024) { log('ERR','Image too large (max 5MB)','err'); return; }
+  imgFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgDataUrl = e.target.result;
+    document.getElementById('imgPrev').src = imgDataUrl;
+    document.getElementById('imgPrevWrap').style.display = 'block';
+    document.getElementById('imgPlaceholder').style.display = 'none';
+    document.getElementById('prevImg').src = imgDataUrl;
+    document.getElementById('prevImg').style.display = 'block';
+    document.getElementById('prevEmoji').style.display = 'none';
+    log('IMG',`<span class="clr-green">✓</span> ${file.name} (${(file.size/1024).toFixed(1)}KB)`,'ok');
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag & drop
+const imgDrop = document.getElementById('imgDrop');
+imgDrop.addEventListener('dragover', e => { e.preventDefault(); imgDrop.style.borderColor='var(--blue)'; });
+imgDrop.addEventListener('dragleave', () => { imgDrop.style.borderColor=''; });
+imgDrop.addEventListener('drop', e => {
+  e.preventDefault(); imgDrop.style.borderColor='';
+  const file = e.dataTransfer.files[0];
+  if (file?.type.startsWith('image/')) {
+    const dt = new DataTransfer(); dt.items.add(file);
+    document.getElementById('imgInput').files = dt.files;
+    handleImg(document.getElementById('imgInput'));
+  }
+});
+
+// ── IPFS UPLOAD via Pinata ─────────────────────────────────────
+async function uploadToIPFS(file, jwt) {
+  if (!file) throw new Error('No image selected');
+  if (!jwt) throw new Error('Pinata JWT not provided');
+  
+  log('IPFS','Uploading image to IPFS via Pinata...','info');
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('pinataMetadata', JSON.stringify({ name: `udev-${Date.now()}` }));
+  
+  const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${jwt}` },
+    body: formData
+  });
+  
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.details || `Pinata error ${res.status}`);
+  }
+  
+  const data = await res.json();
+  const cid = data.IpfsHash;
+  log('IPFS',`<span class="clr-green">✓ Pinned:</span> <span class="clr-blue">${cid}</span>`,'ok');
+  return `https://ipfs.io/ipfs/${cid}`;
+}
+
+// ── PUMP.FUN METADATA UPLOAD ───────────────────────────────────
+async function uploadPumpFunMetadata(params) {
+  /*
+    pump.fun принимает multipart/form-data:
+    - file: изображение
+    - name, symbol, description, twitter, telegram, website, showName
+    Возвращает { metadataUri, metadata: { image, ... } }
+  */
+  log('PUMP','Uploading metadata to pump.fun IPFS...','info');
+  const formData = new FormData();
+  if (params.file) formData.append('file', params.file);
+  formData.append('name', params.name);
+  formData.append('symbol', params.symbol);
+  formData.append('description', params.description || '');
+  if (params.twitter) formData.append('twitter', params.twitter);
+  if (params.telegram) formData.append('telegram', params.telegram);
+  if (params.website) formData.append('website', params.website);
+  formData.append('showName', 'true');
+
+  const PROXY = window.UDEV_SERVER || 'https://udev-server.railway.app';
+    const res = await fetch(PROXY + '/api/pumpfun/ipfs', { method: 'POST', body: formData });
+  if (!res.ok) throw new Error(`pump.fun API error: ${res.status}`);
+  const data = await res.json();
+  log('PUMP',`<span class="clr-green">✓ Metadata URI:</span> <span class="clr-blue">${data.metadataUri?.slice(0,40)}...</span>`,'ok');
+  return data;
+}
+
+// ── MAIN DEPLOY ────────────────────────────────────────────────
+async function deployCoin() {
+  const name = document.getElementById('coinName').value.trim();
+  const ticker = document.getElementById('coinTicker').value.trim().toUpperCase();
+  const desc = document.getElementById('coinDesc').value.trim();
+  const solAmt = parseFloat(document.getElementById('solAmount').value) || 0.1;
+  const pinataJwt = document.getElementById('pinataKey').value.trim();
+
+  // Validation
+  if (!name) { log('ERR','Coin name is required','err'); return; }
+  if (!ticker) { log('ERR','Ticker is required','err'); return; }
+  if (!walletPubkey) { log('ERR','Connect Phantom Wallet first!','err'); await connectWallet(); return; }
+  if (!imgFile && !pinataJwt) { log('WARN','No image uploaded. Token will launch without image.','warn'); }
+
+  const phantom = getPhantom();
+  if (!phantom) { log('ERR','Phantom Wallet not found','err'); return; }
+
+  // UI: disable button, show progress
+  const btn = document.getElementById('deployBtn');
+  btn.disabled = true; btn.textContent = '⏳ Deploying...'; btn.classList.add('loading');
+  const progress = document.getElementById('deploy-progress');
+  const pbar = document.getElementById('progress-bar');
+  const plabel = document.getElementById('progress-label');
+  progress.style.display = 'block';
+
+  const startTime = Date.now();
+
+  const setProgress = (pct, label) => {
+    pbar.style.width = pct + '%';
+    plabel.textContent = label;
+  };
+
+  try {
+    setProgress(10, 'Preparing metadata...');
+    log('DEPLOY',`Launching: <span class="hi">${name} ($${ticker})</span> on <span class="clr-purple">${PLAT_NAMES[selectedPlats[0]]}</span>`,'info');
+
+    // Step 1: Upload metadata to pump.fun IPFS
+    setProgress(25, 'Uploading to pump.fun IPFS...');
+    let metadataUri = '';
+    let metadataData = null;
+
+    try {
+      metadataData = await uploadPumpFunMetadata({
+        file: imgFile,
+        name, symbol: ticker,
+        description: desc,
+        twitter: document.getElementById('coinTwitter').value.trim(),
+        telegram: document.getElementById('coinTelegram').value.trim(),
+        website: document.getElementById('coinWebsite').value.trim(),
+      });
+      metadataUri = metadataData.metadataUri;
+    } catch(e) {
+      log('WARN',`pump.fun IPFS failed: ${e.message}. Trying Pinata fallback...`,'warn');
+      if (imgFile && pinataJwt) {
+        const imgUri = await uploadToIPFS(imgFile, pinataJwt);
+        metadataUri = imgUri; // simplified fallback
+      } else {
+        log('WARN','No image/Pinata key — launching without image','warn');
+        metadataUri = '';
+      }
+    }
+
+    setProgress(45, 'Building Solana transaction...');
+    log('RPC','Connecting to Solana mainnet...','info');
+
+    // Step 2: Create token via Solana transaction
+    // pump.fun create endpoint: https://pump.fun/api/trade-local
+    // This uses their local trading API which returns a transaction to sign
+    const conn = new solanaWeb3.Connection(RPC_ENDPOINT, 'confirmed');
+    
+    // Generate new mint keypair for the token
+    const mintKeypair = solanaWeb3.Keypair.generate();
+    log('MINT',`Mint address: <span class="clr-blue">${mintKeypair.publicKey.toBase58()}</span>`,'info');
+    
+    setProgress(60, 'Requesting transaction from pump.fun...');
+
+    // Call pump.fun trade-local API to get the create transaction
+    const tradeParams = {
+      publicKey: walletPubkey,
+      action: 'create',
+      tokenMetadata: {
+        name: name,
+        symbol: ticker,
+        uri: metadataUri,
+      },
+      mint: mintKeypair.publicKey.toBase58(),
+      denominatedInSol: 'true',
+      amount: solAmt,
+      slippage: 10,
+      priorityFee: 0.0001,
+      pool: 'pump'
+    };
+
+    const txRes = await fetch((window.UDEV_SERVER || 'https://udev-server.railway.app') + '/api/pumpfun/trade-local', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tradeParams)
+    });
+
+    if (!txRes.ok) {
+      const errText = await txRes.text();
+      throw new Error(`pump.fun API: ${txRes.status} — ${errText.slice(0,100)}`);
+    }
+
+    setProgress(75, 'Signing transaction with Phantom...');
+    log('SIGN','Requesting signature from Phantom...','info');
+
+    // Deserialize transaction
+    const txData = await txRes.arrayBuffer();
+    const tx = solanaWeb3.VersionedTransaction.deserialize(new Uint8Array(txData));
+
+    // Sign with mint keypair (required for token creation)
+    tx.sign([mintKeypair]);
+
+    // Sign with user wallet via Phantom
+    const signedTx = await phantom.signTransaction(tx);
+    log('SIGN','<span class="clr-green">✓ Transaction signed</span>','ok');
+
+    setProgress(88, 'Broadcasting to Solana network...');
+    log('RPC','Sending transaction...','info');
+
+    // Send transaction
+    const signature = await conn.sendRawTransaction(signedTx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+
+    setProgress(95, 'Awaiting confirmation...');
+    log('TX',`Signature: <span class="clr-blue">${signature.slice(0,16)}...</span>`,'info');
+
+    // Wait for confirmation
+    const conf = await conn.confirmTransaction(signature, 'confirmed');
+    if (conf.value.err) throw new Error('Transaction failed on-chain');
+
+    // ✅ SUCCESS
+    const elapsed = Date.now() - startTime;
+    setProgress(100, 'Deployed!');
+    lastTxCa = mintKeypair.publicKey.toBase58();
+    lastTxSpeed = elapsed;
+
+    log('TX',`<span class="clr-green">✓ CONFIRMED</span> in ${elapsed}ms`,'ok');
+    log('CA',`Contract: <span class="clr-blue">${lastTxCa}</span>`,'ok');
+    log('DEX','Token will appear on DexScreener within ~60s','ok');
+
+    // Refresh balance
+    await fetchBalance();
+
+    // Show success modal
+    const platName = PLAT_NAMES[selectedPlats[0]] || 'pump.fun';
+    document.getElementById('succSub').textContent = `${name} ($${ticker}) is live on ${platName}`;
+    document.getElementById('succCa').textContent = lastTxCa;
+    document.getElementById('succBuy').textContent = `${solAmt} SOL`;
+    document.getElementById('succPlat').textContent = platName;
+    document.getElementById('succSpeed').textContent = `${elapsed}ms`;
+    document.getElementById('succOverlay').classList.add('open');
+
+    // Auto-sell if enabled
+    if (activeTools.has('autosell')) {
+      const delay = parseInt(document.getElementById('sellDelay').value) || 500;
+      log('AUTO',`Auto-sell in ${delay}ms...`,'warn');
+      setTimeout(() => autoSell(mintKeypair.publicKey.toBase58(), solAmt), delay);
+    }
+
+  } catch(e) {
+    log('ERR',`Deploy failed: <span class="clr-red">${e.message}</span>`,'err');
+    if (e.message.includes('rejected')) log('INFO','User rejected the transaction in Phantom','info');
+    else if (e.message.includes('insufficient')) log('INFO','Not enough SOL for fees + dev buy','info');
+    setProgress(0, 'Failed');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🚀 Deploy Coin';
+    btn.classList.remove('loading');
+    setTimeout(() => { progress.style.display = 'none'; }, 3000);
+  }
+}
+
+// ── AUTO SELL ──────────────────────────────────────────────────
+async function autoSell(mintAddress, amount) {
+  if (!walletPubkey) return;
+  const phantom = getPhantom();
+  const pct = parseInt(document.getElementById('sellPct').value) || 100;
+  log('AUTO',`Selling ${pct}% of ${mintAddress.slice(0,8)}...`,'warn');
+  try {
+    const conn = new solanaWeb3.Connection(RPC_ENDPOINT, 'confirmed');
+    const res = await fetch((window.UDEV_SERVER || 'https://udev-server.railway.app') + '/api/pumpfun/trade-local', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        publicKey: walletPubkey,
+        action: 'sell',
+        mint: mintAddress,
+        amount: pct === 100 ? BigInt('18446744073709551615').toString() : Math.floor(amount * pct / 100 * 1e6).toString(),
+        denominatedInSol: 'false',
+        slippage: 15,
+        priorityFee: 0.0001,
+        pool: 'pump'
+      })
+    });
+    if (!res.ok) throw new Error(`sell API ${res.status}`);
+    const txData = await res.arrayBuffer();
+    const tx = solanaWeb3.VersionedTransaction.deserialize(new Uint8Array(txData));
+    const signed = await phantom.signTransaction(tx);
+    const sig = await conn.sendRawTransaction(signed.serialize());
+    await conn.confirmTransaction(sig, 'confirmed');
+    log('AUTO',`<span class="clr-green">✓ Auto-sell executed</span> — ${sig.slice(0,12)}...`,'ok');
+    await fetchBalance();
+  } catch(e) {
+    log('AUTO',`Auto-sell failed: ${e.message}`,'err');
+  }
+}
+
+// ── VAMP ───────────────────────────────────────────────────────
+function openVamp() { document.getElementById('vampOverlay').classList.add('open'); }
+function closeVamp() { document.getElementById('vampOverlay').classList.remove('open'); }
+
+async function doVamp() {
+  const ca = document.getElementById('vampCA').value.trim();
+  if (!ca) { log('VAMP','Enter a contract address','err'); return; }
+  closeVamp();
+  log('VAMP',`Fetching: <span class="clr-blue">${ca.slice(0,12)}...${ca.slice(-6)}</span>`,'info');
+  
+  try {
+    // Use DexScreener to fetch token data
+    const res = await fetch(`${window.UDEV_SERVER || 'https://udev-server.railway.app'}/api/token/${ca}`);
+    const data = await res.json();
+    const pair = data.pairs?.[0];
+    
+    if (!pair) throw new Error('Token not found on DexScreener');
+    
+    const tokenName = pair.baseToken?.name || 'VampToken';
+    const tokenSymbol = pair.baseToken?.symbol || 'VAMP';
+    
+    document.getElementById('coinName').value = tokenName;
+    document.getElementById('coinTicker').value = tokenSymbol.toUpperCase();
+    document.getElementById('coinDesc').value = `Vamped version of ${tokenName}. Original CA: ${ca.slice(0,8)}...`;
+    updatePreview();
+    
+    log('VAMP',`<span class="clr-green">✓ Found:</span> <span class="hi">${tokenName} ($${tokenSymbol})</span>`,'ok');
+    log('VAMP','Form filled — ready to deploy! 🧛','ok');
+    
+    // Insta-vamp
+    if (document.getElementById('togInstaVamp').classList.contains('on')) {
+      log('VAMP','Insta-Vamp enabled — deploying immediately...','warn');
+      setTimeout(deployCoin, 500);
+    }
+  } catch(e) {
+    log('VAMP',`Failed: ${e.message}`,'err');
+    // Fallback
+    document.getElementById('coinName').value = 'VampedCoin';
+    document.getElementById('coinTicker').value = 'VAMP';
+    document.getElementById('coinDesc').value = `Vamped from CA: ${ca.slice(0,12)}...`;
+    updatePreview();
+    log('VAMP','Used fallback data','warn');
+  }
+}
+
+// ── PREVIEW ────────────────────────────────────────────────────
+function updatePreview() {
+  const name = document.getElementById('coinName').value || 'Coin Name';
+  const ticker = document.getElementById('coinTicker').value || 'TICK';
+  const desc = document.getElementById('coinDesc').value || 'Your description here...';
+  const amt = parseFloat(document.getElementById('solAmount').value) || 0.1;
+  const platName = PLAT_NAMES[selectedPlats[0]] || 'pump.fun';
+
+  document.getElementById('prevName').textContent = name;
+  document.getElementById('prevTicker').textContent = `$${ticker.toUpperCase()} · ${platName}`;
+  document.getElementById('prevDesc').textContent = desc;
+  document.getElementById('prevBuy').textContent = `${amt} ${currentChain}`;
+  document.getElementById('desc-count').textContent = document.getElementById('coinDesc').value.length + '/200';
+
+  const fee = amt * 0.0125 + 0.02;
+  document.getElementById('statFee').textContent = `~${fee.toFixed(3)} SOL`;
+
+  const platColors = {
+    pump:['rgba(155,114,239,.12)','#9b72ef','rgba(155,114,239,.3)'],
+    bonk:['rgba(139,195,74,.12)','#8bc34a','rgba(139,195,74,.3)'],
+    fourmeme:['rgba(245,200,66,.12)','#f5c842','rgba(245,200,66,.3)'],
+  };
+  const pills = selectedPlats.map(p => {
+    const [bg,col,brd] = platColors[p]||['rgba(255,255,255,.05)','#888','rgba(255,255,255,.1)'];
+    return `<span class="plat-pill" style="background:${bg};color:${col};border-color:${brd}">${PLAT_NAMES[p]||p}</span>`;
+  }).join('');
+  document.getElementById('prevPlats').innerHTML = pills;
+  checkBalanceWarning();
+}
+
+// ── PLATFORM SELECT ────────────────────────────────────────────
+function selectPlat(el) {
+  const p = el.dataset.p;
+  const idx = selectedPlats.indexOf(p);
+  if (idx > -1) {
+    if (selectedPlats.length === 1) return;
+    selectedPlats.splice(idx,1);
+    el.className = 'plat-item';
+    el.querySelector('.plat-check').textContent = '';
+  } else {
+    selectedPlats.push(p);
+    el.className = 'plat-item ' + (p==='fourmeme'?'sel-bnb':'sel-sol');
+    el.querySelector('.plat-check').textContent = '✓';
+    log('PLAT',`Added: ${PLAT_NAMES[p]||p}`,'info');
+  }
+  updatePreview();
+}
+
+// ── AMOUNT PRESETS ─────────────────────────────────────────────
+function setAmt(v, btn) {
+  document.getElementById('solAmount').value = v;
+  document.querySelectorAll('.presets .preset').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  updatePreview();
+}
+
+// ── ADVANCED TOOLS ─────────────────────────────────────────────
+function toggleTool(name) {
+  const btn = document.getElementById('btn-'+name);
+  const sub = document.getElementById(name+'-sub');
+  const cls = {multi:'act-purple',autosell:'act-green',sniper:'act-purple',mayhem:'act-yellow'};
+  if (activeTools.has(name)) {
+    activeTools.delete(name);
+    btn.className = 'tool-btn';
+    if(sub) sub.style.display='none';
+    log('TOOL',`${name} disabled`,'sys');
+  } else {
+    activeTools.add(name);
+    btn.className = 'tool-btn '+(cls[name]||'act-purple');
+    if(sub) sub.style.display='flex';
+    if(name==='multi' && multiCoins.length===0) addMultiCoin();
+    if(name==='mayhem') log('WARN','⚠️ Mayhem: AI trades for volume. Use at own risk!','warn');
+    else log('TOOL',`${name} <span class="clr-green">enabled</span>`,'ok');
+  }
+  document.getElementById('statTools').textContent = activeTools.size;
+}
+
+function addMultiCoin() {
+  if(multiCoins.length>=4){log('MULTI','Max 4 coins','warn');return;}
+  multiCoins.push(multiCoins.length+1);
+  renderMulti();
+}
+function clearMulti(){multiCoins=[];renderMulti();}
+function renderMulti(){
+  document.getElementById('multi-coins').innerHTML=multiCoins.map((_,i)=>`
+    <div class="multi-row">
+      <div class="multi-n">${i+1}</div>
+      <input type="number" value="0.05" min="0.01" step="0.01" style="flex:1;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none">
+      <select style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:5px;color:var(--text2);font-size:11px;outline:none">
+        <option>pump.fun</option><option>Bonk</option><option>FourMeme</option>
+      </select>
+      <button onclick="multiCoins.splice(${i},1);renderMulti()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px">×</button>
+    </div>`).join('');
+}
+
+// ── CHAIN SWITCH ───────────────────────────────────────────────
+function switchChain(){
+  currentChain=currentChain==='SOL'?'BNB':'SOL';
+  document.getElementById('chain-badge').textContent=currentChain;
+  document.getElementById('amtSfx').textContent=currentChain;
+  log('CHAIN',`Switched to <span class="hi">${currentChain}</span>`,'info');
+  updatePreview();
+}
+
+// ── SUCCESS MODAL ──────────────────────────────────────────────
+function copyCa(){
+  navigator.clipboard.writeText(lastTxCa).then(()=>log('COPY','CA copied to clipboard','ok'));
+}
+function openExplorer(){
+  if(lastTxCa) window.open(`https://solscan.io/token/${lastTxCa}`,'_blank');
+}
+function closeSucc(){ document.getElementById('succOverlay').classList.remove('open'); }
+
+// ── PINATA KEY MANAGEMENT ──────────────────────────────────────
+function savePinataKey() {
+  const inp = document.getElementById('pinataKey');
+  const jwt = inp.value.trim();
+  if (!jwt) { showPinataStatus('Введите JWT ключ', 'err'); return; }
+  if (!jwt.startsWith('eyJ')) { showPinataStatus('Неверный формат — JWT начинается с eyJ', 'err'); return; }
+  try {
+    localStorage.setItem('pinata_jwt', jwt);
+    showPinataStatus('✓ Ключ сохранён! Теперь можно деплоить.', 'ok');
+    log('IPFS', '<span class="clr-green">✓ Pinata JWT сохранён в браузере</span>', 'ok');
+  } catch(e) {
+    showPinataStatus('Ошибка сохранения: ' + e.message, 'err');
+  }
+}
+
+function togglePinataVis() {
+  const inp = document.getElementById('pinataKey');
+  const btn = document.getElementById('pinataVisBtn');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    inp.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+function showPinataStatus(msg, type) {
+  const el = document.getElementById('pinataStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.background = type === 'ok' ? 'var(--green2)' : 'var(--red2)';
+  el.style.color = type === 'ok' ? 'var(--green)' : 'var(--red)';
+  el.style.border = '1px solid ' + (type === 'ok' ? 'var(--green3)' : 'var(--red3)');
+  el.textContent = msg;
+  if (type === 'ok') setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ── PHANTOM EVENTS ─────────────────────────────────────────────
+window.addEventListener('load', () => {
+  checkPhantomInstalled();
+  // Load saved Pinata key
+  const savedJwt = localStorage.getItem('pinata_jwt');
+  if (savedJwt) {
+    document.getElementById('pinataKey').value = savedJwt;
+    log('IPFS', 'Pinata JWT загружен из браузера', 'ok');
+  }
+  const phantom = getPhantom();
+  if (phantom) {
+    phantom.on('connect', (pubkey) => {
+      walletPubkey = pubkey.toString();
+      onWalletConnected();
+    });
+    phantom.on('disconnect', () => onWalletDisconnected());
+    phantom.on('accountChanged', (pubkey) => {
+      if (pubkey) {
+        walletPubkey = pubkey.toString();
+        onWalletConnected();
+      } else {
+        disconnectWallet();
+      }
+    });
+    // Auto-connect if already approved
+    if (phantom.isConnected && phantom.publicKey) {
+      walletPubkey = phantom.publicKey.toString();
+      onWalletConnected();
+    }
+  }
+  fetchSolPrice();
+  updatePreview();
+  log('SYS','uDev Creator v2.5 — Real Phantom Integration','sys');
+  log('RPC','Solana mainnet RPC ready','ok');
+  log('INFO','Min recommended: <span class="hi">0.1 SOL</span> + gas fees','info');
+  log('INFO','Connect Phantom wallet to deploy','info');
+});
+</script>
+</body>
+</html>
