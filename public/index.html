@@ -314,7 +314,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           <div class="field-row">
             <div class="field">
               <label>Coin Name</label>
-              <input type="text" id="coinName" placeholder="MoonCat" oninput="updatePreview()" maxlength="32">
+              <input type="text" id="coinName" placeholder="MoonCat" oninput="updatePreview();startPreBuild()" maxlength="32">
             </div>
             <div class="field">
               <label>Ticker</label>
@@ -410,6 +410,35 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
             <div id="pinataStatus" style="display:none;margin-top:6px;font-size:11px;padding:5px 8px;border-radius:5px"></div>
             <div style="font-size:10px;color:var(--text3);margin-top:6px">
               Получить бесплатно: <a href="https://app.pinata.cloud/developers/api-keys" target="_blank" style="color:var(--blue)">pinata.cloud → API Keys → New Key</a>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Speed Settings -->
+          <div class="field">
+            <label>⚡ Скорость деплоя</label>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px">
+              <button class="preset" onclick="setPriorityFee('low',this)" style="flex-direction:column;display:flex;align-items:center;gap:2px;padding:6px 4px">
+                <span style="font-size:11px;font-weight:600">Эконом</span>
+                <span style="font-size:9px;color:var(--text3)">0.0001 SOL</span>
+              </button>
+              <button class="preset" onclick="setPriorityFee('medium',this)" style="flex-direction:column;display:flex;align-items:center;gap:2px;padding:6px 4px">
+                <span style="font-size:11px;font-weight:600">Норма</span>
+                <span style="font-size:9px;color:var(--text3)">0.0005 SOL</span>
+              </button>
+              <button class="preset active" onclick="setPriorityFee('high',this)" style="flex-direction:column;display:flex;align-items:center;gap:2px;padding:6px 4px">
+                <span style="font-size:11px;font-weight:600">Быстро</span>
+                <span style="font-size:9px">0.001 SOL</span>
+              </button>
+              <button class="preset" onclick="setPriorityFee('turbo',this)" style="flex-direction:column;display:flex;align-items:center;gap:2px;padding:6px 4px;border-color:var(--yellow)">
+                <span style="font-size:11px;font-weight:600;color:var(--yellow)">🚀 Turbo</span>
+                <span style="font-size:9px;color:var(--text3)">0.005 SOL</span>
+              </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:5px;padding:6px 8px;background:var(--bg3);border-radius:7px;border:1px solid var(--border)">
+              <span style="font-size:10px;color:var(--text3)">Jito Bundle</span>
+              <button class="tog on" id="tog-jito" onclick="this.classList.toggle('on')" style="margin-left:auto"></button>
             </div>
           </div>
 
@@ -642,13 +671,36 @@ let lastTxCa = '';
 let lastTxSpeed = 0;
 
 const PLAT_NAMES = { pump:'pump.fun', bonk:'Bonk Launch', fourmeme:'FourMeme' };
-// Free RPC endpoints (fallback list)
+// ── SPEED CONFIG ──────────────────────────────────────────────
+// RPC endpoints — fastest first
 const RPC_ENDPOINTS = [
-  'https://solana-mainnet.g.alchemy.com/v2/demo',
-  'https://rpc.ankr.com/solana',
-  'https://api.mainnet-beta.solana.com',
+  'https://mainnet.helius-rpc.com/?api-key=demo',  // Helius — fastest
+  'https://rpc.ankr.com/solana',                    // Ankr — reliable
+  'https://api.mainnet-beta.solana.com',            // fallback
 ];
 const RPC_ENDPOINT = RPC_ENDPOINTS[0];
+
+// Jito MEV endpoints — for ultra-fast bundle submission
+const JITO_ENDPOINTS = [
+  'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
+  'https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/bundles',
+  'https://frankfurt.mainnet.block-engine.jito.wtf/api/v1/bundles',
+  'https://ny.mainnet.block-engine.jito.wtf/api/v1/bundles',
+  'https://tokyo.mainnet.block-engine.jito.wtf/api/v1/bundles',
+];
+
+// Priority fee settings (microlamports)
+const PRIORITY_FEES = {
+  low:    100_000,   // ~0.0001 SOL
+  medium: 500_000,   // ~0.0005 SOL
+  high:   1_000_000, // ~0.001 SOL  ← default
+  turbo:  5_000_000, // ~0.005 SOL  ← максимальная скорость
+};
+let currentPriorityFee = PRIORITY_FEES.high;
+
+// Pre-built transaction cache
+let preBuildCache = null;
+let preBuildTimer = null;
 
 // ── LOGGING ────────────────────────────────────────────────────
 function log(tag, msg, type='info') {
@@ -918,7 +970,89 @@ async function uploadPumpFunMetadata(params) {
   return data;
 }
 
-// ── MAIN DEPLOY ────────────────────────────────────────────────
+
+// ── SPEED FUNCTIONS ────────────────────────────────────────────
+
+// Автоматически рассчитать оптимальную priority fee
+async function getOptimalPriorityFee() {
+  try {
+    const conn = new solanaWeb3.Connection(RPC_ENDPOINTS[0], 'confirmed');
+    // Получаем текущие комиссии сети
+    const fees = await conn.getRecentPrioritizationFees();
+    if (fees && fees.length > 0) {
+      const sorted = fees.map(f => f.prioritizationFee).sort((a,b) => b-a);
+      const p75 = sorted[Math.floor(sorted.length * 0.25)]; // 75-й перцентиль
+      const optimal = Math.max(p75 * 1.2, PRIORITY_FEES.high); // +20% буфер
+      log('SPEED', `Оптимальная priority fee: <span class="clr-green">${(optimal/1e6).toFixed(4)} SOL</span>`, 'ok');
+      return Math.floor(optimal);
+    }
+  } catch(e) {
+    log('SPEED', 'Используем дефолтную priority fee', 'warn');
+  }
+  return currentPriorityFee;
+}
+
+// Найти ближайший Jito endpoint (ping test)
+async function getFastestJitoEndpoint() {
+  const tests = JITO_ENDPOINTS.map(async (url) => {
+    const start = Date.now();
+    try {
+      await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}', signal: AbortSignal.timeout(2000) });
+    } catch(e) {}
+    return { url, ms: Date.now() - start };
+  });
+  const results = await Promise.allSettled(tests);
+  const sorted = results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value)
+    .sort((a,b) => a.ms - b.ms);
+  const best = sorted[0]?.url || JITO_ENDPOINTS[0];
+  log('JITO', `Быстрейший endpoint: <span class="clr-blue">${best.split('/')[2]}</span> (${sorted[0]?.ms}ms)`, 'ok');
+  return best;
+}
+
+// Отправить транзакцию через Jito Bundle (ультра-быстро)
+async function sendViaJito(signedTx, jitoEndpoint) {
+  const serialized = Buffer.from(signedTx.serialize()).toString('base64');
+  const res = await fetch(jitoEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0', id: 1,
+      method: 'sendBundle',
+      params: [[serialized]]
+    })
+  });
+  if (!res.ok) throw new Error(`Jito error: ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.result; // bundle ID
+}
+
+// Pre-build: начать подготовку транзакции заранее пока юзер заполняет форму
+function startPreBuild() {
+  if (preBuildTimer) clearTimeout(preBuildTimer);
+  preBuildTimer = setTimeout(async () => {
+    const name = document.getElementById('coinName').value.trim();
+    const ticker = document.getElementById('coinTicker').value.trim();
+    if (!name || !ticker || !walletPubkey) return;
+    log('SPEED', 'Pre-building транзакция...', 'sys');
+    try {
+      // Только оптимизируем RPC соединение заранее
+      preBuildCache = {
+        conn: new solanaWeb3.Connection(RPC_ENDPOINTS[0], {
+          commitment: 'confirmed',
+          disableRetryOnRateLimit: true,
+        }),
+        mintKeypair: solanaWeb3.Keypair.generate(),
+        timestamp: Date.now(),
+      };
+      log('SPEED', '<span class="clr-green">✓ Pre-build готов — деплой будет быстрее</span>', 'ok');
+    } catch(e) {}
+  }, 1000); // начинаем через 1 сек после последнего ввода
+}
+
+// ── MAIN DEPLOY (ULTRA FAST) ───────────────────────────────────
 async function deployCoin() {
   const name = document.getElementById('coinName').value.trim();
   const ticker = document.getElementById('coinTicker').value.trim().toUpperCase();
@@ -980,19 +1114,28 @@ async function deployCoin() {
       }
     }
 
-    setProgress(45, 'Building Solana transaction...');
-    log('RPC','Connecting to Solana mainnet...','info');
+    setProgress(45, 'Оптимизация скорости...');
 
-    // Step 2: Create token via Solana transaction
-    // pump.fun create endpoint: https://pump.fun/api/trade-local
-    // This uses their local trading API which returns a transaction to sign
-    const conn = new solanaWeb3.Connection(RPC_ENDPOINTS[1] || RPC_ENDPOINT, 'confirmed');
-    
-    // Generate new mint keypair for the token
-    const mintKeypair = solanaWeb3.Keypair.generate();
-    log('MINT',`Mint address: <span class="clr-blue">${mintKeypair.publicKey.toBase58()}</span>`,'info');
-    
-    setProgress(60, 'Requesting transaction from pump.fun...');
+    // Используем pre-built кеш если есть (быстрее!)
+    const conn = preBuildCache?.conn || new solanaWeb3.Connection(RPC_ENDPOINTS[0], {
+      commitment: 'confirmed',
+      disableRetryOnRateLimit: true,
+    });
+    const mintKeypair = preBuildCache?.mintKeypair || solanaWeb3.Keypair.generate();
+    preBuildCache = null; // использовали — сбрасываем
+
+    log('MINT', `Mint: <span class="clr-blue">${mintKeypair.publicKey.toBase58().slice(0,12)}...</span>`, 'info');
+
+    // Получаем optimal priority fee и Jito endpoint параллельно
+    setProgress(55, 'Расчёт оптимальных комиссий...');
+    const [optFee, jitoEndpoint] = await Promise.all([
+      getOptimalPriorityFee(),
+      getFastestJitoEndpoint(),
+    ]);
+    currentPriorityFee = optFee;
+    log('SPEED', `Priority fee: <span class="clr-yellow">${(optFee/1e6).toFixed(4)} SOL</span> | Jito: <span class="clr-green">ready</span>`, 'ok');
+
+    setProgress(60, 'Запрос транзакции от pump.fun...');
 
     // Call pump.fun trade-local API to get the create transaction
     const tradeParams = {
@@ -1036,21 +1179,35 @@ async function deployCoin() {
     const signedTx = await phantom.signTransaction(tx);
     log('SIGN','<span class="clr-green">✓ Transaction signed</span>','ok');
 
-    setProgress(88, 'Broadcasting to Solana network...');
-    log('RPC','Sending transaction...','info');
+    setProgress(88, 'Отправка через Jito Bundle...');
+    log('JITO', 'Отправляем транзакцию через Jito MEV...', 'info');
 
-    // Send transaction
-    const signature = await conn.sendRawTransaction(signedTx.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
+    let signature;
+    try {
+      // Попытка 1: Jito Bundle (ультра-быстро, <100ms)
+      const bundleId = await sendViaJito(signedTx, jitoEndpoint);
+      log('JITO', `<span class="clr-green">✓ Bundle отправлен:</span> <span class="clr-blue">${bundleId?.slice(0,16)}...</span>`, 'ok');
+      // Для Jito берём signature из транзакции
+      signature = Buffer.from(signedTx.signatures[0]).toString('hex').slice(0,64);
+    } catch(jitoErr) {
+      // Попытка 2: Обычная отправка (fallback)
+      log('JITO', `Jito fallback: ${jitoErr.message} → обычная отправка`, 'warn');
+      signature = await conn.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: true, // skipPreflight = быстрее
+        preflightCommitment: 'processed',
+        maxRetries: 3,
+      });
+    }
 
-    setProgress(95, 'Awaiting confirmation...');
-    log('TX',`Signature: <span class="clr-blue">${signature.slice(0,16)}...</span>`,'info');
+    setProgress(95, 'Подтверждение...');
+    log('TX', `Sig: <span class="clr-blue">${signature.slice(0,16)}...</span>`, 'info');
 
-    // Wait for confirmation
-    const conf = await conn.confirmTransaction(signature, 'confirmed');
-    if (conf.value.err) throw new Error('Transaction failed on-chain');
+    // Быстрая проверка подтверждения
+    const conf = await Promise.race([
+      conn.confirmTransaction(signature, 'confirmed'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000))
+    ]);
+    if (conf?.value?.err) throw new Error('Transaction failed on-chain');
 
     // ✅ SUCCESS
     const elapsed = Date.now() - startTime;
@@ -1288,6 +1445,14 @@ function openExplorer(){
 function closeSucc(){ document.getElementById('succOverlay').classList.remove('open'); }
 
 // ── PINATA KEY MANAGEMENT ──────────────────────────────────────
+
+function setPriorityFee(level, btn) {
+  currentPriorityFee = PRIORITY_FEES[level] || PRIORITY_FEES.high;
+  document.querySelectorAll('.presets .preset').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  log('SPEED', `Priority fee: <span class="clr-yellow">${level}</span> (${(currentPriorityFee/1e6).toFixed(4)} SOL)`, 'sys');
+}
+
 function savePinataKey() {
   const inp = document.getElementById('pinataKey');
   const jwt = inp.value.trim();
