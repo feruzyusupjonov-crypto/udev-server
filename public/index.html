@@ -233,7 +233,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 <script>
   // После деплоя сервера на Railway замените на ваш URL:
   // window.UDEV_SERVER = 'https://ваш-проект.railway.app';
-  window.UDEV_SERVER = 'https://udev-server.railway.app';
+  window.UDEV_SERVER = 'https://udev-server-production.up.railway.app';
 </script>
 </head>
 <body>
@@ -660,14 +660,31 @@ function clearLog(){ document.getElementById('console').innerHTML=''; }
 
 // ── PHANTOM WALLET ─────────────────────────────────────────────
 function getPhantom() {
-  return window.solana && window.solana.isPhantom ? window.solana : null;
+  if (window.solana?.isPhantom) return window.solana;
+  if (window.phantom?.solana?.isPhantom) return window.phantom.solana;
+  return null;
 }
 
 function checkPhantomInstalled() {
-  if (!getPhantom()) {
-    document.getElementById('noPhantom').style.display = 'block';
-    log('WALLET','Phantom not detected — please install from phantom.app','warn');
-  }
+  // Wait up to 3 seconds for Phantom to inject
+  let attempts = 0;
+  const timer = setInterval(() => {
+    attempts++;
+    if (getPhantom()) {
+      clearInterval(timer);
+      log('WALLET','Phantom обнаружен ✓','ok');
+      document.getElementById('noPhantom').style.display = 'none';
+      // Auto-connect if already approved
+      if (getPhantom().isConnected && getPhantom().publicKey) {
+        walletPubkey = getPhantom().publicKey.toString();
+        onWalletConnected();
+      }
+    } else if (attempts >= 15) {
+      clearInterval(timer);
+      document.getElementById('noPhantom').style.display = 'block';
+      log('WALLET','Phantom не обнаружен — установите на phantom.app','warn');
+    }
+  }, 200);
 }
 
 async function toggleWallet() {
@@ -679,10 +696,12 @@ async function toggleWallet() {
 }
 
 async function connectWallet() {
+  // Give Phantom extra time to inject if needed
+  await new Promise(r => setTimeout(r, 300));
   const phantom = getPhantom();
   if (!phantom) {
-    log('ERR','Phantom Wallet not installed! Visit phantom.app','err');
-    window.open('https://phantom.app','_blank');
+    log('ERR','Phantom не найден. Убедитесь что расширение активно и страница открыта через https://','err');
+    log('INFO','Попробуйте: обновить страницу (F5) и нажать Connect снова','info');
     return;
   }
   setWalletBtn('connecting','⏳','Connecting...');
@@ -1307,11 +1326,7 @@ window.addEventListener('load', () => {
         disconnectWallet();
       }
     });
-    // Auto-connect if already approved
-    if (phantom.isConnected && phantom.publicKey) {
-      walletPubkey = phantom.publicKey.toString();
-      onWalletConnected();
-    }
+    // Auto-connect handled by checkPhantomInstalled
   }
   fetchSolPrice();
   updatePreview();
